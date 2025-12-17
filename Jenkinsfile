@@ -85,49 +85,52 @@ pipeline {
             }
         }
 
-      stage('Deploy Ingress') {
-    steps {
-        echo 'Deploying Ingress resource...'
-        withCredentials([
-            [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
-        ]) {
-            sh """
-              kubectl apply -f k8s/ingress.yaml
-              sleep 10
-              kubectl get ingress ${APP_NAME}-ingress
-            """
+        stage('Deploy Ingress') {
+            steps {
+                echo 'Deploying Ingress resource...'
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
+                ]) {
+                    sh """
+                      kubectl apply -f k8s/ingress.yaml
+                      sleep 10
+                      kubectl get ingress ${APP_NAME}-ingress
+                    """
+                }
+            }
         }
-    }
-}
-
 
         stage('Get Ingress URL') {
             steps {
                 echo 'Fetching Ingress URL...'
-                timeout(time: 10, unit: 'MINUTES') {
-                    waitUntil {
-                        script {
-                            def host = sh(
-                                script: "kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'",
-                                returnStdout: true
-                            ).trim()
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
+                ]) {
+                    timeout(time: 10, unit: 'MINUTES') {
+                        waitUntil {
+                            script {
+                                def host = sh(
+                                    script: "kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'",
+                                    returnStdout: true
+                                ).trim()
 
-                            if (host) {
-                                env.INGRESS_URL = "http://${host}"
-                                echo "Application URL: ${env.INGRESS_URL}"
-                                return true
+                                if (host) {
+                                    env.INGRESS_URL = "http://${host}"
+                                    echo "Application URL: ${env.INGRESS_URL}"
+                                    return true
+                                }
+                                return false
                             }
-                            return false
                         }
                     }
-                }
 
-                sh """
-                  curl -I ${INGRESS_URL}/ || true
-                  curl -I ${INGRESS_URL}/about || true
-                  curl -I ${INGRESS_URL}/services || true
-                  curl -I ${INGRESS_URL}/contact || true
-                """
+                    sh """
+                      curl -I ${INGRESS_URL}/ || true
+                      curl -I ${INGRESS_URL}/about || true
+                      curl -I ${INGRESS_URL}/services || true
+                      curl -I ${INGRESS_URL}/contact || true
+                    """
+                }
             }
         }
     }
@@ -153,4 +156,3 @@ pipeline {
         }
     }
 }
-
