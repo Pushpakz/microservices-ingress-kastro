@@ -85,16 +85,21 @@ pipeline {
             }
         }
 
-        stage('Deploy Ingress') {
-            steps {
-                echo 'Deploying Ingress resource...'
-                sh """
-                  kubectl apply -f k8s/ingress.yaml
-                  sleep 10
-                  kubectl get ingress ${APP_NAME}-ingress
-                """
-            }
+      stage('Deploy Ingress') {
+    steps {
+        echo 'Deploying Ingress resource...'
+        withCredentials([
+            [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']
+        ]) {
+            sh """
+              kubectl apply -f k8s/ingress.yaml
+              sleep 10
+              kubectl get ingress ${APP_NAME}-ingress
+            """
         }
+    }
+}
+
 
         stage('Get Ingress URL') {
             steps {
